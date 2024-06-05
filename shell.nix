@@ -12,7 +12,12 @@ pkgs.mkShell rec {
     php83.unwrapped
     sshfs
     lsyncd
-    nodePackages.intelephense
+
+    # PHP language server
+    nodePackages.intelephense  
+
+    # JS language server
+    nodePackages.typescript-language-server 
   ];
 
   # shellHook = ''

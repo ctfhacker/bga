@@ -18,17 +18,17 @@
 define([
     "dojo","dojo/_base/declare",
     "ebg/core/gamegui",
-    "ebg/counter"
+    "ebg/counter",
+    "ebg/stock"
 ],
 function (dojo, declare) {
     return declare("bgagame.barbershoppertesthearts", ebg.core.gamegui, {
         constructor: function(){
             console.log('barbershoppertesthearts constructor');
-              
-            // Here, you can init the global variables of your user interface
-            // Example:
-            // this.myGlobalValue = 0;
 
+            // Each sprite in the spritesheet is 72x96
+            this.card_width = 72;
+            this.card_height = 96;
         },
         
         /*
@@ -57,6 +57,34 @@ function (dojo, declare) {
             }
             
             // TODO: Set up your game interface here, according to "gamedatas"
+
+            // Player hand
+            this.playerHand = new ebg.stock();
+
+            // Add the handler for clicking on cards
+            dojo.connect(
+                this.playerHand, 
+                'onChangeSelection', 
+                this, 
+                'onPlayerHandSelectionChanged');           
+
+            this.playerHand.create(this, $('myhand'), this.card_width, this.card_height);
+
+            // The spritesheet is 13x4
+            this.playerHand.image_items_per_row = 13;
+
+            for (var color = 0; color < 4; color++) {
+                for (var value= 2; value < 13; value++) {
+                    var card_type_id = this.getCardUniqueId(color, value);
+                    this.playerHand.addItemType(
+                        card_type_id, 
+                        card_type_id, 
+                        g_gamethemeurl + 'img/cards.jpg',
+                        card_type_id);
+                }
+            }
+
+            this.playerHand.addToStockWithId(this.getCardUniqueId(1, 5), 69);
             
  
             // Setup game notifications to handle (see "setupNotifications" method below)
@@ -151,12 +179,9 @@ function (dojo, declare) {
         ///////////////////////////////////////////////////
         //// Utility methods
         
-        /*
-        
-            Here, you can defines some utility methods that you can use everywhere in your javascript
-            script.
-        
-        */
+        getCardUniqueId: function(color, value) {
+            return color * 13 + (value - 2);
+        },
 
 
         ///////////////////////////////////////////////////
@@ -172,6 +197,26 @@ function (dojo, declare) {
             _ make a call to the game server
         
         */
+
+        onPlayerHandSelectionChanged: function() {
+            var items = this.playerHand.getSelectedItems();
+            console.log("Items " + items);
+
+            if (items.length > 0) {
+                if (this.checkAction('playCard', true)) {
+                    // Can play a card
+                    var card_id = items[0].id;
+                    console.log("On playCard " + card_id);
+
+                    this.playerHand.unselectAll();
+                        
+                } else if (this.checkAction('giveCards')) {
+                    // Can give cards => let player select some cards
+                } else {
+                    this.playerHand.unselectAll();
+                }
+            }
+        },
         
         /* Example:
         

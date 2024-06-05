@@ -33,13 +33,13 @@ class barbershoppertesthearts extends Table
         parent::__construct();
         
         $this->initGameStateLabels( array( 
-            //    "my_first_global_variable" => 10,
-            //    "my_second_global_variable" => 11,
-            //      ...
-            //    "my_first_game_variant" => 100,
-            //    "my_second_game_variant" => 101,
-            //      ...
+            "currentHandType" => 10,
+            "trickColor" => 11,
+            "alreadyPlayedHearts" => 12,
         ) );        
+
+        $this->cards = self::getNew("module.common.deck");
+        $this->cards->init("card");
 	}
 	
     protected function getGameName( )
@@ -78,6 +78,34 @@ class barbershoppertesthearts extends Table
         $this->reloadPlayersBasicInfos();
         
         /************ Start the game initialization *****/
+
+        // Hand types:
+        // 0 => give 3 cards to the player on the left
+        // 1 => give 3 cards to the player on the right
+        // 2 => give 3 cards to the player opposite
+        // 3 => keep cards
+        self::setGameStateInitialValue('currentHandType', 0);
+
+        // Trick Color: None to start
+        self::setGameStateInitialValue('trickColor', 0);
+        
+        // Mark if we already played hearts during this hand
+        self::setGameStateInitialValue('alreadyPlayedHearts', 0);
+
+        // Create cards
+        $cards = array();
+        foreach($this->suits as $suit_id => $suit) {
+            // spade, heart, diamon, club
+            for($value = 2; $value <= 14; $value++) {
+                $cards[] = array (
+                    'type' => $suit_id, 
+                    'type_arg' => $value,
+                    'nbr' => 1
+                );
+            }
+
+            $this->cards->createCards($cards, 'deck');
+        }
 
         // Init global values with their initial values
         //$this->setGameStateInitialValue( 'my_first_global_variable', 0 );
