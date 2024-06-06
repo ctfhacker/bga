@@ -94,9 +94,9 @@ class barbershoppertesthearts extends Table
 
         // Create cards
         $cards = array();
-        foreach($this->suits as $suit_id => $suit) {
-            // spade, heart, diamon, club
-            for($value = 2; $value <= 14; $value++) {
+        foreach($this->suits as $suit_id => $suit) {}
+            // spade, heart, diamond, club
+            for($value = 2; $value < 15; $value++) {
                 $cards[] = array (
                     'type' => $suit_id, 
                     'type_arg' => $value,
@@ -105,6 +105,13 @@ class barbershoppertesthearts extends Table
             }
 
             $this->cards->createCards($cards, 'deck');
+        }
+
+        // Deal 13 cards to each player
+        $this->cards->shuffle('deck');
+        $players = self::loadPlayersBasicInfos();
+        foreach($players as $player_id => $player) {
+            $cards = $this->cards->pickCards(13, 'deck', $player_id);
         }
 
         // Init global values with their initial values
@@ -145,6 +152,8 @@ class barbershoppertesthearts extends Table
         $result['players'] = $this->getCollectionFromDb( $sql );
   
         // TODO: Gather all information about current game situation (visible by player $current_player_id).
+        $result['hand'] = $this->cards->getCardsInLocation('hand', $current_player_id);
+        $result['cardsontable'] = $this->cards->getCardsInLocation('cardsontable');
   
         return $result;
     }
@@ -174,6 +183,9 @@ class barbershoppertesthearts extends Table
     /*
         In this space, you can put any utility methods useful for your game logic
     */
+    function argGiveCards() {
+        return array();
+    }
 
 
 
@@ -185,6 +197,97 @@ class barbershoppertesthearts extends Table
         Each time a player is doing some game action, one of the methods below is called.
         (note: each method below must match an input method in barbershoppertesthearts.action.php)
     */
+
+    function playCard($card_id) {
+        self::checkAction("playCard");
+        $player_id = self::getActivePlayerId();
+
+        // Move the given card from the player's hand to the table
+        $this->cards->moveCard($card_id, 'cardsontable', $player_id);
+
+        // TODO(corydu): Impl actual rules
+
+        $currentCard = $this->cards->getCard($card_id);
+
+        $card_value = $currentCard['type_arg'];
+        $card_suit  = $currentCard['type'];
+        
+        // Notify all players of the action
+        self::notifyAllPlayers('playCard',
+            clienttranslate('${player_name} plays ${value_displayed} ${color_displayed}'),
+            array( 
+                'il8n' => array ('color_displayed', 'value_displayed'), 
+                'card_id' => $card_id, 
+                'player_id' => $player_id,
+                'player_name' => self::getActivePlayerName(),
+                'value' => $card_value,
+                'value_displayed' => $this->values_label[$card_value],
+                'suit' => $card_suit,
+                'color_displayed' => $this->suits[$card_suit]['name']
+            )
+        );
+
+        $this->gamestate->nextState('playCard');
+    }
+
+    function stNewHand() {
+        // Take back all cards
+        $this->cards->moveAllCardsInLocation(null, 'deck');
+        $this->cards->shuffle('deck');
+
+        // Deal 13 cards to each player
+        $players = self::loadPlayersBasicInfos();
+        foreach($players as $player_id => $player) {
+            $cards = $this->cards->pickCards(13, 'deck', $player_id);
+
+            // Notify player of their cards
+            self::notifyPlayer($player_id, 'newHand', '', array('cards' => $cards));
+        }
+
+        self::setGameStateValue('alreadyPlayedHearts', 0);
+        $this->gamestate->nextState("");
+    }
+
+    function stNewTrick() {
+        // New trick: Activate the player who won the last trick. 
+        // First trick starts with the player with the 2 of clubs
+
+        // No starting trick color
+        self::setGameStateValue('trickColor', 0);
+        $this->gamestate->nextState();
+    }
+
+    function stNextPlayer() {
+        // One of three options:
+        // * Activate the next player
+        // * End the trick and go to next trick
+        // * End the hand
+        if ($this->cards->countCardInLocation('cardsontable') == 4) {
+            // All players have played their cards
+
+            // TODO(corydu): Rules for figuring out the winning player
+            $best_value_player_id = self::activeNextPlayer();
+            
+            // Move all cards to 'cardswon' for the winning player
+            $this->cards->moveAllCardsInLocation('cardsontable', 'cardswon', null, $best_value_player_id);
+
+            if($this->cards->countCardsInLocation('hand') == 0) {
+                // End of hand
+                $this->gamestate->nextState("endHand");
+            } else {
+                $this->gamestate->nextState("nextTrick");
+            }
+        } else {
+            // Next player must play a card
+            $player_id = self::activeNextPlayer();
+            self::giveExtraTime($player_id);
+            $this->gamestate->nextState("nextPlayer");
+        }
+    }
+
+    function stEndHand() {
+        $this->gamestate->nextState("nextHand");
+    }
 
     /*
     
@@ -346,3 +449,4 @@ class barbershoppertesthearts extends Table
 
     }    
 }
+

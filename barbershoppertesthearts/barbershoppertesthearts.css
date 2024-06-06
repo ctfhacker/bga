@@ -48,6 +48,13 @@
 
 /********* You can start writing your CSS below this line: **********/
 
+canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: -1; /* Ensures the canvas is behind other content */
+}
+
 #playertables {
     position: relative;
     width: 710px;
@@ -93,6 +100,12 @@
     display: inline-block;
     postion: relative;
     margin-top: 5px;
+    width: 72px;
+    height: 96px;
+}
+
+.cardontable {
+    position: absolute;
     width: 72px;
     height: 96px;
     background-image: url('img/cards.jpg');

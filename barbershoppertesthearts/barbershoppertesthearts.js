@@ -73,9 +73,9 @@ function (dojo, declare) {
             // The spritesheet is 13x4
             this.playerHand.image_items_per_row = 13;
 
-            for (var color = 0; color < 4; color++) {
-                for (var value= 2; value < 13; value++) {
-                    var card_type_id = this.getCardUniqueId(color, value);
+            for (var suit = 1; suit < 5; suit++) {
+                for (var value = 2; value < 15; value++) {
+                    var card_type_id = this.getCardUniqueId(suit, value);
                     this.playerHand.addItemType(
                         card_type_id, 
                         card_type_id, 
@@ -84,9 +84,25 @@ function (dojo, declare) {
                 }
             }
 
-            this.playerHand.addToStockWithId(this.getCardUniqueId(1, 5), 69);
-            
- 
+            // Cards in player hand
+            for (var i in this.gamedatas.hand) {
+                var card = this.gamedatas.hand[i]       
+                var suit = card.type;
+                var value = card.type_arg;
+                var id = this.getCardUniqueId(suit, value);
+                this.playerHand.addToStockWithId(id, card.id);
+            }
+
+            // Cards on table
+            for (var i in this.gamedatas.cardsontable) {                    
+                var card = this.gamedatas.cardsontable[i];
+                var suit = card.type;
+                var value = card.type_arg;
+                var player_id = card.location_arg;
+                this.playCardOnTable(player_id, suit, value, card.id);
+            }
+
+
             // Setup game notifications to handle (see "setupNotifications" method below)
             this.setupNotifications();
 
@@ -179,10 +195,35 @@ function (dojo, declare) {
         ///////////////////////////////////////////////////
         //// Utility methods
         
-        getCardUniqueId: function(color, value) {
-            return color * 13 + (value - 2);
+        getCardUniqueId: function(suit, value) {
+            return (suit - 1) * 13 + (value - 2);
         },
 
+        playCardOnTable: function(player_id, suit, value, card_id) {
+            // player_id => direction       
+            dojo.place(this.format_block('jstpl_cardontable', {
+                x: this.card_width * (value - 2),
+                y: this.card_height * (suit - 1),
+                player_id: player_id
+            }), 'playertablecard_' + player_id);
+
+            if (player_id != this.player_id) {
+                // Opponent played a card. Move card from control panel
+                this.placeOnObject('cardontable_' + player_id, 'overall_player_board_' + player_id);
+            } else {
+                // Current player played a card. If the card exists in hand, move it from
+                // the hand to the table
+                var card_in_hand = 'myhand_item_' + card_id;
+                if ($(card_in_hand)) {
+                    this.slideToObject(card_in_hand, 'playertablecard_' + player_id).play();
+                    this.placeOnObject('cardontable_' + player_id, card_in_hand);
+                    this.playerHand.removeFromStockById(card_id);
+                }
+            }
+
+            // Regardless, move it to the final destination
+            this.slideToObject('cardontable_' + player_id, 'playertablecard_' + player_id).play();
+        },
 
         ///////////////////////////////////////////////////
         //// Player's action
@@ -200,16 +241,20 @@ function (dojo, declare) {
 
         onPlayerHandSelectionChanged: function() {
             var items = this.playerHand.getSelectedItems();
-            console.log("Items " + items);
 
             if (items.length > 0) {
-                if (this.checkAction('playCard', true)) {
+                var action = 'playCard';
+                if (this.checkAction(action, true)) {
                     // Can play a card
                     var card_id = items[0].id;
-                    console.log("On playCard " + card_id);
+                    this.ajaxcall("/" + this.game_name + "/" + this.game_name + "/" + action + ".html", 
+                        { id: card_id, lock: true }, 
+                        true,
+                        function(result) { },
+                        function(error) { },
+                    );
 
                     this.playerHand.unselectAll();
-                        
                 } else if (this.checkAction('giveCards')) {
                     // Can give cards => let player select some cards
                 } else {
@@ -269,34 +314,30 @@ function (dojo, declare) {
         {
             console.log( 'notifications subscriptions setup' );
             
-            // TODO: here, associate your game notifications with local methods
-            
-            // Example 1: standard notification handling
-            // dojo.subscribe( 'cardPlayed', this, "notif_cardPlayed" );
-            
-            // Example 2: standard notification handling + tell the user interface to wait
-            //            during 3 seconds after calling the method in order to let the players
-            //            see what is happening in the game.
-            // dojo.subscribe( 'cardPlayed', this, "notif_cardPlayed" );
-            // this.notifqueue.setSynchronous( 'cardPlayed', 3000 );
-            // 
+            dojo.subscribe('newHand', this, "notif_newHand");
+            dojo.subscribe('playCard', this, "notif_playCard");
         },  
-        
-        // TODO: from this point and below, you can write your game notifications handling methods
-        
-        /*
-        Example:
-        
-        notif_cardPlayed: function( notif )
-        {
-            console.log( 'notif_cardPlayed' );
-            console.log( notif );
+
+        notif_newHand: function(notif) {
+            // We received a hand of 13 cards       
+
+            for(var i in notif.args.cards) {
+                var card = notif.args.cards[i];
+                var suit = card.type;
+                var value= card.type_arg;
+                var card_uniq_id = this.getCardUniqueId(suit, value);
+                this.playerHand.addToStockWithId(card_uniq_id, card.id);
+            }
+        },
             
-            // Note: notif.args contains the arguments specified during you "notifyAllPlayers" / "notifyPlayer" PHP call
-            
-            // TODO: play the card in the user interface.
-        },    
-        
-        */
+        notif_playCard: function(notif) {
+            // Play a card on the table
+            this.playCardOnTable(
+                notif.args.player_id, 
+                notif.args.suit,
+                notif.args.value,
+                notif.args.card_id
+            );
+        }
    });             
 });

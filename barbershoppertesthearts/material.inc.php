@@ -1,6 +1,6 @@
 <?php
 
-$this->suits= array(
+$this->suits = array(
     1 => array(
         'name' => clienttranslate('spade'),
         'nametr' => self::_('spade')
