@@ -18,6 +18,9 @@ pkgs.mkShell rec {
 
     # JS language server
     nodePackages.typescript-language-server 
+
+    # Watch tools
+    inotify-tools
   ];
 
   # shellHook = ''
